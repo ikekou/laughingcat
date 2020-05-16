@@ -6,25 +6,34 @@
 
 AccelStepper stepper(1, 6, 5); // Defaults to AccelStepper::FULL4WIRE (4 pins) on 2, 3, 4, 5
 int direction = 1;
+int WAIT_POSITION = -200;
 
 // switch
 
-int switchPin = 18;
+const int SWITCH_PIN = 18;
 bool isSwitchPressed = false;
 
-//
+// distance sensor
 
 VL53L0X sensor;
-int NEAR = 50;
+const int NEAR = 50;
 
 // state
 
 int state = 0;
-int STATE_INIT = 1;
-int READY = 2;
+const int STATE_INIT = 1;
+const int STATE_READY = 2;
+const int STATE_WAIT = 3;
+
+/*----------------------------------------
+ * setup
+ ----------------------------------------*/
 
 void setup()
 {
+
+  // state
+
   state = STATE_INIT;
 
   // serial
@@ -34,22 +43,23 @@ void setup()
   // switch
 
   Wire.begin();
-  pinMode(switchPin, INPUT_PULLUP);
+  pinMode(SWITCH_PIN, INPUT_PULLUP);
 
-  // sensor
+  // distance sensor
 
   Wire.begin();
-
   sensor.setTimeout(500);
   if (!sensor.init())
   {
     Serial.println("Failed to detect and initialize sensor!");
-    while (1) {}
+    while (1)
+    {
+      // noop
+    }
   }
-
   sensor.startContinuous();
 
-  // 
+  // motor
 
   stepper.setMaxSpeed(1000);
   stepper.setAcceleration(1000);
@@ -57,6 +67,10 @@ void setup()
   Serial.println(stepper.maxSpeed());
   Serial.println(stepper.speed());
 }
+
+/*----------------------------------------
+ * loop
+ ----------------------------------------*/
 
 void loop()
 {
@@ -68,20 +82,38 @@ void loop()
 
   // switch
 
-  int switchValue = digitalRead(switchPin);
+  int switchValue = digitalRead(SWITCH_PIN);
   isSwitchPressed = switchValue == 0;
-//  Serial.println(isSwitchPressed);
 
   // state
 
   Serial.println(state);
 
-  if (state == STATE_INIT) {
-    onInit();
-  } else if (state == READY) {
-    //    stepper.setSpeed(100);
-    //    stepper.setMaxSpeed(1000);
+  swit(state)
+  {
+  case STATE_INIT:
+    init();
+    run();
+    break;
+  case STATE_READY:
+    ready();
+    break;
+  case STATE_WAIT:
+    wait();
+    break;
   }
+
+  // if (state == STATE_INIT)
+  // {
+  //   init();
+  //   stepper.run();
+  // }
+  // else if (state == STATE_READY)
+  // {
+  //   //    stepper.setSpeed(100);
+  //   //    stepper.setMaxSpeed(1000);
+  //   ready();
+  // }
 
   //  //
   //
@@ -102,28 +134,60 @@ void loop()
 
   //  // run
   //
-  stepper.run();
-//  stepper.runSpeed();
+  //  stepper.runSpeed();
 }
 
-void onInit() {
-  if (isSwitchPressed) {
-    stepper.setCurrentPosition(0);
-    stepper.move(0);
+/*----------------------------------------
+ * run
+ ----------------------------------------*/
 
-    delay(3000);
+void run()
+{
+  stepper.run();
+}
 
-    state = READY;
-    stepper.moveTo(-200);
-    
+/*----------------------------------------
+ * init
+ ----------------------------------------*/
+
+void init()
+{
+  if (isSwitchPressed)
+  {
+    state = STATE_READY;
     return;
   }
 
-  if (stepper.distanceToGo() != 0) return;
+  if (stepper.distanceToGo() != 0)
+    return;
 
-  int s = 100;
-//  stepper.setMaxSpeed(1000);
-//  stepper.setSpeed(s);
-//  stepper.setAcceleration(1000);
   stepper.move(100);
+}
+
+/*----------------------------------------
+ * ready
+ ----------------------------------------*/
+
+void ready()
+{
+  stepper.setCurrentPosition(0);
+  stepper.move(0);
+
+  delay(3000);
+
+  stepper.moveTo(WAIT_POSITION);
+
+  state = STATE_WAIT;
+}
+
+/*----------------------------------------
+ * wait
+ ----------------------------------------*/
+
+void wait()
+{
+  if (stepper.distanceToGo() != 0)
+    return;
+
+  // WIP...
 }
