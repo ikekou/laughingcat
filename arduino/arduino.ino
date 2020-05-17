@@ -22,8 +22,9 @@ const int NEAR = 50;
 
 int state = 0;
 const int STATE_INIT = 1;
-const int STATE_READY = 2;
-const int STATE_WAIT = 3;
+const int STATE_RESET = 2;
+const int STATE_READY = 3;
+const int STATE_WAIT = 4;
 
 /*----------------------------------------
  * setup
@@ -39,6 +40,7 @@ void setup()
   // serial
 
   Serial.begin(9600);
+  Serial.println('a');
 
   // switch
 
@@ -57,15 +59,28 @@ void setup()
       // noop
     }
   }
-  sensor.startContinuous();
+  // sensor.startContinuous();
+
+  // high speed mode
+  sensor.setMeasurementTimingBudget(20000);
+
+  Serial.println('b');
 
   // motor
 
-  stepper.setMaxSpeed(1000);
-  stepper.setAcceleration(1000);
 
-  Serial.println(stepper.maxSpeed());
-  Serial.println(stepper.speed());
+  Serial.println('c');
+
+  // Serial.println(stepper.maxSpeed());
+  // Serial.println(stepper.speed());
+
+  Serial.println('d');
+
+  stepper.setMaxSpeed(1000.0);
+  stepper.setAcceleration(1000.0);
+  stepper.runToNewPosition(-100);
+
+  Serial.println('e');
 }
 
 /*----------------------------------------
@@ -74,11 +89,13 @@ void setup()
 
 void loop()
 {
+  // Serial.println(state);
 
   // sensor
 
-  int sensorValue = sensor.readRangeContinuousMillimeters();
-  bool isNear = sensorValue < NEAR;
+  // int sensorValue = sensor.readRangeContinuousMillimeters();
+  //int sensorValue = sensor.readRangeSingleMillimeters();
+  // bool isNear = sensorValue < NEAR;
 
   // switch
 
@@ -87,19 +104,23 @@ void loop()
 
   // state
 
-  Serial.println(state);
-
-  swit(state)
+  switch (state)
   {
   case STATE_INIT:
-    init();
+    doInit();
+    run();
+    break;
+  case STATE_RESET:
+    doReset();
     run();
     break;
   case STATE_READY:
-    ready();
+    doReady();
+    run();
     break;
   case STATE_WAIT:
-    wait();
+    doWait();
+    run();
     break;
   }
 
@@ -144,50 +165,85 @@ void loop()
 void run()
 {
   stepper.run();
+  // stepper.runSpeedToPosition();
+  // stepper.runSpeed();
 }
 
 /*----------------------------------------
  * init
+ * 初期化、リセットスイッチでゼロ位置リセット
  ----------------------------------------*/
 
-void init()
+void doInit()
 {
   if (isSwitchPressed)
   {
-    state = STATE_READY;
+    Serial.println("init end");
+    state = STATE_RESET;
     return;
   }
 
-  if (stepper.distanceToGo() != 0)
-    return;
+  if (stepper.distanceToGo() == 0){
+    Serial.println("init start");
+    // stepper.setMaxSpeed(1000.0);
+    // stepper.setAcceleration(1000.0);
 
-  stepper.move(100);
+    stepper.setMaxSpeed(1000);
+    stepper.setAcceleration(1000);
+    stepper.move(200); // スイッチに当たったら止まるので、とりあえずガっと適当に回す、相対値
+
+    Serial.println(stepper.speed());
+    return;
+  }
 }
 
 /*----------------------------------------
  * ready
+ * 待機座標に移動
  ----------------------------------------*/
 
-void ready()
+void doReset()
 {
-  stepper.setCurrentPosition(0);
-  stepper.move(0);
+  delay(1000);
 
-  delay(3000);
+  stepper.setCurrentPosition(0);
 
   stepper.moveTo(WAIT_POSITION);
+
+  state = STATE_READY;
+}
+
+/*----------------------------------------
+ * ready
+ * 待機座標に移動中
+ ----------------------------------------*/
+
+void doReady()
+{
+  if (stepper.distanceToGo() != 0)
+    return;
+
+  delay(1000);
 
   state = STATE_WAIT;
 }
 
 /*----------------------------------------
  * wait
+ * 待機座標近辺でゆらゆらしながら待ち受ける
  ----------------------------------------*/
 
-void wait()
+void doWait()
 {
-  if (stepper.distanceToGo() != 0)
-    return;
-
-  // WIP...
+  if (stepper.distanceToGo() == 0){
+    Serial.println("change");
+    // stepper.moveTo(WAIT_POSITION + rand() % 30);
+    int range = 45;
+    stepper.moveTo(random(WAIT_POSITION-range,WAIT_POSITION+range)); // 絶対値
+    stepper.setMaxSpeed(random(100,3000));
+    stepper.setAcceleration(random(100,3000));
+	  // stepper.setMaxSpeed((rand() % 30) + 1);
+	  // stepper.setAcceleration((rand() % 30) + 1);
+    Serial.println(stepper.speed());
+  }
 }
