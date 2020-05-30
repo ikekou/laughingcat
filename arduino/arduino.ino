@@ -1,6 +1,9 @@
 #include <AccelStepper.h>
-//#include <Wire.h>
-//#include <VL53L0X.h>
+#include <Wire.h>
+
+/*----------------------------------------
+ * variables
+ ----------------------------------------*/
 
 // motor
 
@@ -13,10 +16,10 @@ int WAIT_POSITION = -300;
 const int SWITCH_PIN = 18;
 bool isSwitchPressed = false;
 
-// distance sensor
+// sensor
 
-//VL53L0X sensor;
-//const int NEAR = 50;
+const int SENSOR_PIN = A1;
+const int DISTANCE_THRESHOLD = 30;
 
 // state
 
@@ -25,6 +28,14 @@ const int STATE_INIT = 1;
 const int STATE_RESET = 2;
 const int STATE_READY = 3;
 const int STATE_WAIT = 4;
+const int STATE_HOGE = 5;
+
+//
+
+int count = 0;
+byte sensorValue = 0;
+
+bool isHoge = false;
 
 /*----------------------------------------
  * setup
@@ -32,7 +43,10 @@ const int STATE_WAIT = 4;
 
 void setup()
 {
-  //pinMode(SENSOR_PIN,INPUT_PULLUP);
+  // Wire
+
+  Wire.begin(8);
+  Wire.onReceive(requestEvent); //割り込み関数の指定
 
   // state
 
@@ -41,49 +55,42 @@ void setup()
   // serial
 
   Serial.begin(9600);
-//  Serial.println('a');
 
   // switch
 
   pinMode(SWITCH_PIN, INPUT_PULLUP);
 
-  // distance sensor
-
-//  Wire.begin();
-//  sensor.setTimeout(500);
-//  if (!sensor.init())
-//  {
-//    Serial.println("Failed to detect and initialize sensor!");
-//    while (1)
-//    {
-      // noop
-//    }
-//  }
-  // sensor.startContinuous();
-
-  // high speed mode
-//  sensor.setMeasurementTimingBudget(20000);
-
-  // Serial.println('b');
-
   // motor
-
-
-  // Serial.println('c');
-
-  // Serial.println(stepper.maxSpeed());
-  // Serial.println(stepper.speed());
-
-  // Serial.println('d');
 
   stepper.setMaxSpeed(1000.0);
   stepper.setAcceleration(1000.0);
   stepper.runToNewPosition(-200);
-
-  // Serial.println('e');
 }
 
-int count = 0;
+void requestEvent(int a)
+{
+  sensorValue = 1;
+  // Serial.println("req");
+  // Serial.println("");
+  // Serial.println("");
+  // Serial.println("");
+  // Serial.println("a");
+
+  if (Wire.available())
+  {
+  // Serial.println("b");
+    byte newValue = Wire.read();
+    if(newValue<250){
+      sensorValue = newValue;
+    }
+    Serial.println(sensorValue);
+    // sensorValue = 2;
+    // Wire.write(1);
+  }
+  // sensorValue = (int)c;
+  // sensorValue = c;
+  // sensorValue = 1;
+}
 
 /*----------------------------------------
  * loop
@@ -91,32 +98,30 @@ int count = 0;
 
 void loop()
 {
+  // Wire.requestFrom(0x1E, 1);
 
-  bool isNear = analogRead(A1) > 30;
-//  Serial.println(isNear);
+  // while (Wire.available())
+  // {
+  //   byte val = Wire.read();
+  //   Serial.print(val);
+  // }
 
-  if(isNear){
-    state = STATE_INIT;
-//    return;
-  }
+  // int sensorValue = analogRead(SENSOR_PIN);
+  // Serial.println(sensorValue);
+  // bool isNear = sensorValue > DISTANCE_THRESHOLD;
 
-//  return;
-  
-//  count++;
-//  Serial.println(count);
+  // if (isHoge)
+  // {
+  // state = STATE_INIT;
+  // stepper.set
+  // isHoge = false;
+  // }
 
-//  if(count>= 2000){
-//    count=0;
-//    state = STATE_INIT;
-//  }
-
-//   Serial.println(state);
-
-  // sensor
-
-  // int sensorValue = sensor.readRangeContinuousMillimeters();
-  //int sensorValue = sensor.readRangeSingleMillimeters();
-  // bool isNear = sensorValue < NEAR;
+  // while (Wire.available())
+  // {                       // 要求より短いデータが来る可能性あり
+  //   char c = Wire.read(); // 1バイトを受信
+  //   Serial.print(c);
+  // }
 
   // switch
 
@@ -128,55 +133,26 @@ void loop()
   switch (state)
   {
   case STATE_INIT:
+    // Serial.println("init");
     doInit();
     run();
     break;
   case STATE_RESET:
+    // Serial.println("reset");
     doReset();
     run();
     break;
   case STATE_READY:
+    // Serial.println("ready");
     doReady();
     run();
     break;
   case STATE_WAIT:
+    // Serial.println("wait");
     doWait();
     run();
     break;
   }
-
-  // if (state == STATE_INIT)
-  // {
-  //   init();
-  //   stepper.run();
-  // }
-  // else if (state == STATE_READY)
-  // {
-  //   //    stepper.setSpeed(100);
-  //   //    stepper.setMaxSpeed(1000);
-  //   ready();
-  // }
-
-  //  //
-  //
-  ////  if(state == NORMAL_STATE){
-  ////    if (stepper.distanceToGo() == 0)
-  ////    {
-  ////      direction *= -1;
-  ////      delay(random(10, 100));
-  ////      int distance = 10; //random(10,20); //random(,100);
-  ////      stepper.moveTo(distance * direction);
-  ////      ////    stepper.setMaxSpeed((rand() % 200) + 100);
-  ////      int s = 1000;
-  ////      stepper.setMaxSpeed(s);
-  ////      ////    stepper.setAcceleration((rand() % 200) + 100);
-  ////      stepper.setAcceleration(9999);
-  ////    }
-  ////  }
-
-  //  // run
-  //
-  //  stepper.runSpeed();
 }
 
 /*----------------------------------------
@@ -186,8 +162,6 @@ void loop()
 void run()
 {
   stepper.run();
-  // stepper.runSpeedToPosition();
-  // stepper.runSpeed();
 }
 
 /*----------------------------------------
@@ -199,22 +173,16 @@ void doInit()
 {
   if (isSwitchPressed)
   {
-    // Serial.println("init end");
+    // Serial.println("isSwitchPressed");
     state = STATE_RESET;
     return;
   }
 
-  if (stepper.distanceToGo() == 0){
-    // Serial.println("init start");
-    // stepper.setMaxSpeed(1000.0);
-    // stepper.setAcceleration(1000.0);
-
+  if (stepper.distanceToGo() == 0)
+  {
     stepper.setMaxSpeed(3000);
     stepper.setAcceleration(3000);
-    stepper.move(200); // スイッチに当たったら止まるので、とりあえずガっと適当に回す、相対値
-
-    // Serial.println(stepper.speed());
-    return;
+    stepper.move(400); // スイッチに当たったら止まるので、とりあえずガっと適当に回す、相対値
   }
 }
 
@@ -256,15 +224,29 @@ void doReady()
 
 void doWait()
 {
-  if (stepper.distanceToGo() == 0){
-    // Serial.println("change");
-    // stepper.moveTo(WAIT_POSITION + rand() % 30);
-    int range = 45;
-    stepper.moveTo(random(WAIT_POSITION-range,WAIT_POSITION+range)); // 絶対値
-    stepper.setMaxSpeed(random(100,1000));
-    stepper.setAcceleration(random(100,1000));
-	  // stepper.setMaxSpeed((rand() % 30) + 1);
-	  // stepper.setAcceleration((rand() % 30) + 1);
-    // Serial.println(stepper.speed());
+  if (stepper.distanceToGo() == 0)
+  {
+    if (random(0.0, 100.0) < 10.0)
+    {
+      // Serial.println("slow");
+      stepper.moveTo(stepper.currentPosition() + random(0.0, 3.0)); // 絶対値
+      stepper.setMaxSpeed(1);
+    }
+    else
+    {
+      // Serial.println("speed");
+      int range = 60;
+      direction *= -1;
+      //stepper.moveTo(random(WAIT_POSITION - range, WAIT_POSITION + range)); // 絶対値
+      stepper.moveTo(WAIT_POSITION + random(0, range) * direction); // 絶対値
+      // stepper.moveTo(WAIT_POSITION + range * direction); // 絶対値
+      // stepper.setMaxSpeed(random(1000, 5000));
+      stepper.setMaxSpeed(10000);
+      // stepper.setAcceleration(random(1000, 5000));
+      stepper.setAcceleration(10000);
+      // delay(2000);
+    }
   }
 }
+
+// int direction = 1;
