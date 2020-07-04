@@ -29,6 +29,7 @@ const int STATE_RESET = 2;
 const int STATE_READY = 3;
 const int STATE_WAIT = 4;
 const int STATE_HOGE = 5;
+const int STATE_ATTACKED = 6;
 
 //
 
@@ -36,6 +37,8 @@ int count = 0;
 byte sensorValue = 0;
 
 bool isHoge = false;
+
+int waitCount = 0;
 
 /*----------------------------------------
  * setup
@@ -62,6 +65,7 @@ void setup()
 
   // motor
 
+  stepper.setSpeed(1000);
   stepper.setMaxSpeed(1000.0);
   stepper.setAcceleration(1000.0);
   stepper.runToNewPosition(-200);
@@ -70,26 +74,20 @@ void setup()
 void requestEvent(int a)
 {
   sensorValue = 1;
-  // Serial.println("req");
-  // Serial.println("");
-  // Serial.println("");
-  // Serial.println("");
-  // Serial.println("a");
 
   if (Wire.available())
   {
-  // Serial.println("b");
     byte newValue = Wire.read();
     if(newValue<250){
       sensorValue = newValue;
     }
-    Serial.println(sensorValue);
-    // sensorValue = 2;
-    // Wire.write(1);
+    // Serial.println(sensorValue);
+
+    if(sensorValue > 10){
+      state = STATE_ATTACKED;
+      // Serial.println("attacked (real)");
+    }
   }
-  // sensorValue = (int)c;
-  // sensorValue = c;
-  // sensorValue = 1;
 }
 
 /*----------------------------------------
@@ -133,26 +131,28 @@ void loop()
   switch (state)
   {
   case STATE_INIT:
-    // Serial.println("init");
     doInit();
-    run();
     break;
   case STATE_RESET:
     // Serial.println("reset");
     doReset();
-    run();
     break;
   case STATE_READY:
     // Serial.println("ready");
     doReady();
-    run();
     break;
   case STATE_WAIT:
     // Serial.println("wait");
     doWait();
-    run();
+    break;
+  case STATE_ATTACKED:
+    doAttacked();
     break;
   }
+
+  // update
+
+  run();
 }
 
 /*----------------------------------------
@@ -180,9 +180,10 @@ void doInit()
 
   if (stepper.distanceToGo() == 0)
   {
-    stepper.setMaxSpeed(3000);
-    stepper.setAcceleration(3000);
-    stepper.move(400); // スイッチに当たったら止まるので、とりあえずガっと適当に回す、相対値
+    stepper.setMaxSpeed(1000);
+    stepper.setAcceleration(100);
+    stepper.move(1600); // スイッチに当たったら止まるので、とりあえずガっと適当に回す、相対値
+    // stepper.setSpeed(500);
   }
 }
 
@@ -193,11 +194,14 @@ void doInit()
 
 void doReset()
 {
-  delay(3000);
+  delay(5000);
 
   stepper.setCurrentPosition(0);
 
+  stepper.setMaxSpeed(1000);
+  stepper.setAcceleration(100);
   stepper.moveTo(WAIT_POSITION);
+  // stepper.setSpeed(500);
 
   state = STATE_READY;
 }
@@ -212,9 +216,10 @@ void doReady()
   if (stepper.distanceToGo() != 0)
     return;
 
-  delay(1000);
+  // delay(1000);
 
   state = STATE_WAIT;
+
 }
 
 /*----------------------------------------
@@ -224,29 +229,64 @@ void doReady()
 
 void doWait()
 {
+  if(waitCount>0) {
+    delay(1);
+      // Serial.println("waiting");
+    waitCount--;
+    return;
+  }
+
   if (stepper.distanceToGo() == 0)
   {
-    if (random(0.0, 100.0) < 10.0)
-    {
-      // Serial.println("slow");
-      stepper.moveTo(stepper.currentPosition() + random(0.0, 3.0)); // 絶対値
-      stepper.setMaxSpeed(1);
+    float randomValue = random(0.0, 100.0);
+
+    if (randomValue < 1.0){
+      // Serial.println("attacked (dummy)");
+      state = STATE_ATTACKED;
+      stepper.setCurrentPosition(0);
     }
+    
+    else if (randomValue < 10.0)
+    {
+      // Serial.println("wait");
+      // stepper.moveTo(stepper.currentPosition() + random(0.0, 3.0)); // 絶対値
+      // stepper.setMaxSpeed(1);
+      //waitCount = random(300,500);
+      waitCount = random(100,2000);
+      Serial.println(waitCount);
+    }
+
     else
     {
-      // Serial.println("speed");
-      int range = 60;
+      // Serial.println("random");
+      int range = 50;
       direction *= -1;
-      //stepper.moveTo(random(WAIT_POSITION - range, WAIT_POSITION + range)); // 絶対値
+      int a = 1000;
+      stepper.setMaxSpeed(a);
+      stepper.setAcceleration(a);
       stepper.moveTo(WAIT_POSITION + random(0, range) * direction); // 絶対値
-      // stepper.moveTo(WAIT_POSITION + range * direction); // 絶対値
-      // stepper.setMaxSpeed(random(1000, 5000));
-      stepper.setMaxSpeed(10000);
-      // stepper.setAcceleration(random(1000, 5000));
-      stepper.setAcceleration(10000);
-      // delay(2000);
     }
   }
 }
 
-// int direction = 1;
+/*----------------------------------------
+ * attacked
+ * 襲われた
+ ----------------------------------------*/
+
+void doAttacked()
+{
+  if (isSwitchPressed)
+  {
+    state = STATE_RESET;
+    return;
+  }
+
+  if (stepper.distanceToGo() == 0)
+  {
+    int s = 900;
+    stepper.setMaxSpeed(s);
+    stepper.setAcceleration(s*2);
+    stepper.move(10000); // スイッチに当たったら止まるので、とりあえずガっと適当に回す、相対値
+  }
+}
